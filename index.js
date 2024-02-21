@@ -1,99 +1,98 @@
-//const e = require('express');
-const express = require('express');
-const Sequelize = require('sequelize');
+// Description: REST API with MongoDB
+// npm install express mongoose  body-parser
+// Run this file with node MongoDBREST.js
+// Test with Postman
+
+const express = require("express");
+const mongoose = require("mongoose");
+const bodyParser = require("body-parser");
+
+// Database connection
+mongoose.connect(
+  "mongodb://admin:CVYopo91291@node58153-env-5982902.proen.app.ruk-com.cloud:11857",
+  {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  }
+);
+
+const Book = mongoose.model("Book", {
+  id: {
+    type: Number,
+    unique: true, // Ensures uniqueness of the "id" field
+    required: true, // If you want "id" to be required
+  },
+  title: String,
+  author: String,
+});
+
 const app = express();
+app.use(bodyParser.json());
 
-app.use(express.json());
+// Create
+app.post("/books", async (req, res) => {
+  try {
+    // Get the last book record to determine the next ID
+    const lastBook = await Book.findOne().sort({ id: -1 });
+    const nextId = lastBook ? lastBook.id + 1 : 1;
 
-const dbUrl = 'postgres://webadmin:ITVkem98301@node58155-env-5982902.proen.app.ruk-com.cloud/Books'
-const sequelize = new Sequelize(dbUrl)
-//
-
-/*const sequelize = new Sequelize('database', 'username', 'password', {
-    host: 'localhost',
-    dialect: 'sqlite',
-    storage: './Database/SQBooks.sqlite'
-});
-*/
-
-const Book = sequelize.define('book', {
-    id: {
-        type: Sequelize.INTEGER,
-        autoIncrement: true,
-        primaryKey: true
-    },
-    title:{
-        type: Sequelize.STRING,
-        allowNull: false
-    },
-    author:{
-        type: Sequelize.STRING,
-        allowNull: false
-    }
-});
-
-sequelize.sync();
-
-app.get('/books', (req, res) => {
-    Book.findAll().then(Books => {
-        res.json(Books);
-    }).catch(err => {
-        res.status(500).send(err);
+    // Create a new book with the next ID
+    const book = new Book({
+      id: nextId, // Set the custom "id" field
+      ...req.body, // Include other book data from the request body
     });
+
+    await book.save();
+    res.send(book);
+  } catch (error) {
+    res.status(500).send(error);
+  }
 });
 
-app.get('/books/:id', (req, res) => {
-    Book.findByPk(req.params.id).then(book => {
-        if(!book){
-            res.status(404).send('Book not found');
-        }else{
-            res.json(book);
-        }
-    }).catch(err => {
-        res.status(500).send(err);
+// Read all
+app.get("/books", async (req, res) => {
+  try {
+    const books = await Book.find();
+    res.send(books);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+// Read one
+app.get("/books/:id", async (req, res) => {
+  try {
+    const book = await Book.findOne({id:req.params.id});
+    res.send(book);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+// Update
+app.put("/books/:id", async (req, res) => {
+  try {
+    const book = await Book.findOneAndUpdate({id:req.params.id}, req.body, {
+      new: true,
     });
+    res.send(book);
+  } catch (error) {
+    res.status(500).send(error);
+  }
 });
 
-app.post('/books', (req, res) => {
-    Book.create(req.body).then(book => {
-        res.send(book);
-    }).catch(err => {
-        res.status(500).send(err);
-    });
+// Delete
+app.delete("/books/:id", async (req, res) => {
+  try {
+    const book = await Book.findOneAndDelete({id:req.params.id});
+    res.send(book);
+  } catch (error) {
+    res.status(500).send(error);
+  }
 });
 
-app.put('/books/:id', (req, res) => {
-    Book.findByPk(req.params.id).then(book => {
-        if (!book) {
-            res.status(404).send('Book not found');
-        }else{
-            book.update(req.body).then(() => {
-                res.send(book);
-            }).catch(err => {
-                res.status(500).send(err);
-            });
-        }
-    }).catch(err => {
-        res.status(500).send(err);
-    });
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server started at http://localhost:${PORT}`);
 });
-
-//route to delete a book
-app.delete('/books/:id', (req, res) => {
-    Book.findByPk(req.params.id).then(book => {
-        if (!book) {
-            res.status(404).send('Book not found');
-        }else{
-            book.destroy().then(() =>{
-                res.send({});
-            }).catch(err => {
-                res.status(500).send(err);
-            });
-        }
-    }).catch(err => {
-        res.status(500).send(err);
-    });
-});
-
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`));
