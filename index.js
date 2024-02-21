@@ -1,72 +1,96 @@
+//const e = require('express');
 const express = require('express');
-const sqlite3 = require('sqlite3');
+const Sequelize = require('sequelize');
 const app = express();
-
-const db = new sqlite3.Database('./Database/Book.sqlite');
 
 app.use(express.json());
 
-db.run(`CREATE TABLE IF NOT EXISTS books (
-    id INTEGER PRIMARY KEY,
-    title TEXT,
-    author TEXT
-)`);
+const dbUrl = 'postgres://webadmin:ITVkem98301@node58155-env-5982902.proen.app.ruk-com.cloud/Books'
+const sequelize = new Sequelize(dbUrl)
+
+/*const sequelize = new Sequelize('database', 'username', 'password', {
+    host: 'localhost',
+    dialect: 'sqlite',
+    storage: './Database/SQBooks.sqlite'
+});
+*/
+
+const Book = sequelize.define('book', {
+    id: {
+        type: Sequelize.INTEGER,
+        autoIncrement: true,
+        primaryKey: true
+    },
+    title:{
+        type: Sequelize.STRING,
+        allowNull: false
+    },
+    author:{
+        type: Sequelize.STRING,
+        allowNull: false
+    }
+});
+
+sequelize.sync();
 
 app.get('/books', (req, res) => {
-    db.all('SELECT * FROM books', (err, rows) => {
-        if (err) {
-            res.status(500).send(err);
-        }else {
-            res.json(rows);
-        }
+    Book.findAll().then(Books => {
+        res.json(Books);
+    }).catch(err => {
+        res.status(500).send(err);
     });
 });
 
 app.get('/books/:id', (req, res) => {
-    db.get('SELECT * FROM books WHERE id = ?', req.params.id, (err, row) => {
-        if (err) {
-            res.status(500).send(err);
-        }else {
-            if (!row) {
-                res.status(404).send('Book not found');
-            }else {
-                res.json(row);
-            }
+    Book.findByPk(req.params.id).then(book => {
+        if(!book){
+            res.status(404).send('Book not found');
+        }else{
+            res.json(book);
         }
-    
+    }).catch(err => {
+        res.status(500).send(err);
     });
 });
 
 app.post('/books', (req, res) => {
-    const book = req.body;
-    db.run('INSERT INTO books (title, author) VALUES (?, ?)', book.title, book.author, function(err) {
-        if (err) {
-            res.status(500).send(err);
-        }else {
-            book.id = this.lastID;
-            res.send(book);
-        }
+    Book.create(req.body).then(book => {
+        res.send(book);
+    }).catch(err => {
+        res.status(500).send(err);
     });
 });
 
 app.put('/books/:id', (req, res) => {
-    const book = req.body;
-    db.run('UPDATE books SET title = ?, author = ? WHERE id = ?', book.title, book.author, req.params.id, function(err) {
-        if (err) {
-            res.status(500).send(err);
-        } else {
-            res.send(book);
+    Book.findByPk(req.params.id).then(book => {
+        if (!book) {
+            res.status(404).send('Book not found');
+        }else{
+            book.update(req.body).then(() => {
+                res.send(book);
+            }).catch(err => {
+                res.status(500).send(err);
+            });
         }
+    }).catch(err => {
+        res.status(500).send(err);
     });
 });
 
+//route to delete a book
 app.delete('/books/:id', (req, res) => {
-    db.run('DELETE FROM books WHERE id = ?', req.params.id, function(err) {
-        if (err) {
-            res.status(500).send(err);
-        }else {
-            res.send({});
+    Book.findByPk(req.params.id).then(book => {
+        if (!book) {
+            res.status(404).send('Book not found');
+        }else{
+            book.destroy().then(() =>{
+                res.send({});
+            }).catch(err => {
+                res.status(500).send(err);
+            });
         }
+    }).catch(err => {
+        res.status(500).send(err);
     });
 });
 
